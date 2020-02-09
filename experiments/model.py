@@ -8,23 +8,70 @@ Author: Jan Schlüter
 """
 
 import numpy as np
-import lasagne
-from lasagne.layers import (InputLayer, Conv2DLayer, MaxPool2DLayer,
-                            DenseLayer, dropout)
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-def architecture(input_var, input_shape):
-    layer = InputLayer(input_shape, input_var)
-    kwargs = dict(nonlinearity=lasagne.nonlinearities.leaky_rectify,
-                  W=lasagne.init.Orthogonal())
-    layer = Conv2DLayer(layer, 64, 3, **kwargs)
-    layer = Conv2DLayer(layer, 32, 3, **kwargs)
-    layer = MaxPool2DLayer(layer, 3)
-    layer = Conv2DLayer(layer, 128, 3, **kwargs)
-    layer = Conv2DLayer(layer, 64, 3, **kwargs)
-    layer = MaxPool2DLayer(layer, 3)
-    layer = DenseLayer(dropout(layer, 0.5), 256, **kwargs)
-    layer = DenseLayer(dropout(layer, 0.5), 64, **kwargs)
-    layer = DenseLayer(dropout(layer, 0.5), 1,
-                       nonlinearity=lasagne.nonlinearities.sigmoid,
-                       W=lasagne.init.Orthogonal())
-    return layer
+
+###############################################################################
+#-------------Pytorch implementation of singing voice detection---------------#
+###############################################################################
+def count_parameters(model):
+    total_param = 0
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            num_param = np.prod(param.size())
+            # if param.dim() > 1:
+            #     print(name, ':', 'x'.join(str(x) for x in list(param.size())), '=', num_param)
+            # else:
+            #     print(name, ':', num_param)
+            total_param += num_param
+    # print('Total Parameters: {}'.format(total_param))
+    return total_param
+
+class CNNModel(nn.Module):
+    def __init__(self):
+        super(CNNModel, self).__init__()
+        self.conv = nn.Sequential(
+                    nn.Conv2d(1,64,3),
+                    nn.LeakyReLU(inplace=True),
+                    nn.Conv2d(64,32,3),
+                    nn.LeakyReLU(inplace=True),
+                    nn.MaxPool2d(3),
+                    nn.Conv2d(32,128,3),
+                    nn.LeakyReLU(inplace=True),
+                    nn.Conv2d(128,64,3),
+                    nn.LeakyReLU(inplace=True),
+                    nn.MaxPool2d(3),
+                    nn.Flatten())
+        
+        self.fc = nn.Sequential(
+                    nn.Dropout(),
+                    nn.Linear(64*11*7,256),
+                    nn.LeakyReLU(inplace=True),
+                    nn.Dropout(),
+                    nn.Linear(256,64),
+                    nn.LeakyReLU(inplace=True),
+                    nn.Dropout(),
+                    nn.Linear(64,1),
+                    nn.Sigmoid())
+        
+        self.param_count = count_parameters(self)
+        print(self.param_count)
+        
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight.data)
+                if m.bias is not None:
+                    m.bias.data.zero_()
+            elif isinstance(m, nn.Conv2d):
+                nn.init.orthogonal_(m.weight.data)
+                if m.bias is not None:
+                    m.bias.data.zero_()
+                                 
+    
+    def forward(self,x):
+        y = self.conv(x)
+        return self.fc(y)
+
+

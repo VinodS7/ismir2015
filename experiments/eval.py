@@ -57,12 +57,11 @@ def load_labels(filelist, predictions, fps, datadir):
 def evaluate(predictions, truth, threshold=None, smoothen=56,
         collapse_files=True, compute_auroc=False):
     assert len(predictions) == len(truth)
-
+   
     # preprocess network outputs
     if smoothen:
         predictions = [scipy.ndimage.filters.median_filter(
                 pred, smoothen, mode='nearest') for pred in predictions]
-
     # evaluate
     if threshold is None or compute_auroc:
         thresholds = np.hstack(([1e-5, 1e-4, 1e-3],
