@@ -1,19 +1,12 @@
 Exploring Data Augmentation for Improved Singing Voice Detection with Neural Networks
 =====================================================================================
 
-This is a reimplementation of the experiments presented in the paper "Exploring
+This is a reimplementation in Pytorch of the experiments presented in the paper "Exploring
 Data Augmentation for Improved Singing Voice Detection with Neural Networks" by
 Jan Schlüter and Thomas Grill at the 16th International Society for Music
 Information Retrieval Conference (ISMIR 2015).
 [[Paper](http://ofai.at/~jan.schlueter/pubs/2015_ismir.pdf),
 [BibTeX](http://ofai.at/~jan.schlueter/pubs/2015_ismir.bib)]
-
-For follow-up experiments described in my PhD thesis, see the
-[`phd_extra`](//github.com/f0k/ismir2015/tree/phd_extra) branch, and for
-experiments on training a network to not be irritated by wiggly lines, see the
-[`unhorse`](//github.com/f0k/ismir2015/tree/unhorse) branch. For a
-demonstration on how the networks can be fooled with hand-drawn wiggly lines,
-see the [`singing_horse`](//github.com/f0k/singing_horse) repository.
 
 
 Preliminaries
@@ -21,7 +14,7 @@ Preliminaries
 
 The code requires the following software:
 * Python 2.7+ or 3.4+
-* Python packages: numpy, scipy, Theano, Lasagne
+* Python packages: numpy, scipy, torch
 * bash or a compatible shell with wget and tar
 * ffmpeg or avconv
 
