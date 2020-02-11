@@ -117,7 +117,7 @@ def main():
                              audio.extract_spect,
                              os.path.join(datadir, 'audio', fn),
                              sample_rate, frame_len, fps))
-
+    
     # - load and convert corresponding labels
     print("Loading labels...")
     labels = []
@@ -243,16 +243,15 @@ def main():
     
     print("preparing training function...")
     mdl = model.CNNModel()
-    print(mdl)
-    return
     mdl = mdl.to(device)
     
+    #Setting up learning rate and learning rate parameters
     initial_eta = cfg['initial_eta']
     eta_decay = cfg['eta_decay']
     momentum = cfg['momentum']
     eta_decay_every = cfg.get('eta_decay_every', 1)
     eta = initial_eta
-    print(cfg) 
+
     #set up loss
     criterion = torch.nn.BCELoss()
 
@@ -261,28 +260,37 @@ def main():
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer,step_size=eta_decay_every,gamma=eta_decay)
 
     #set up optimizer 
-    writer = SummaryWriter()
+    writer = SummaryWriter(os.path.join(modelfile,'runs'))
 
+    
     epochs = cfg['epochs']
     epochsize = cfg['epochsize']
     batches = iter(batches)
+    
+    #conditions to save model
+    best_val_loss = 100000.
+    best_val_error = 1.
 
     for epoch in range(epochs):
+        # - Initialize certain parameters that are used to monitor training
         err = 0
-        n_iter = 0 
         total_norm = 0
         loss_accum = 0
+        mdl.train(True)
+        # - Compute the L-2 norm of the gradients
         for p in mdl.parameters():
             if p.grad is not None:
                 param_norm = p.grad.data.norm(2)
                 total_norm += param_norm.item() ** 2
         total_norm = total_norm ** (1. / 2)
         
-        writer.add_scalar('Gradient norm',total_norm,epoch)
+        # - Start the training for this epoch
         for batch in progress(range(epochsize), min_delay=0.5,desc='Epoch %d/%d: Batch ' % (epoch+1, epochs)):
             data = next(batches)
             input_data = np.transpose(data[0][:,:,:,np.newaxis],(0,3,1,2))
             labels = data[1][:,np.newaxis].astype(np.float32)
+            
+            #map labels to make them softer
             labels = (0.02 + 0.96*labels)
             optimizer.zero_grad()
             
@@ -290,20 +298,23 @@ def main():
             loss = criterion(outputs, torch.from_numpy(labels).to(device))
             loss.backward()
             optimizer.step()
-            writer.add_scalar('training loss per batch',loss.item())
             loss_accum += loss.item()
-            n_iter+=1
+        
+        
+        # - Compute validation loss and error if desired
         if options.validate:
             
             from eval import evaluate
-            val_err = 0
+            mdl.train(False) 
+            val_loss = 0
             preds = []
             labs = []
             max_len = fps
-            # - precompute mel spectra, if needed, otherwise just define a generator
+            
             mel_spects_val = (np.log(np.maximum(np.dot(spect[:, :bin_mel_max], filterbank),
                                     1e-7))
                   for spect in spects_val)
+            
             mel_spects_val = [(spect - mean) * istd for spect in mel_spects_val]
 
             num_iter = 0 
@@ -313,7 +324,8 @@ def main():
                 excerpts = np.lib.stride_tricks.as_strided(
                     spect, shape=(num_excerpts, blocklen, spect.shape[1]),
                     strides=(spect.strides[0], spect.strides[0], spect.strides[1]))
-                # - pass mini-batches through the network and concatenate results
+                
+                # - Pass mini-batches through the network and concatenate results
                 for pos in range(0, num_excerpts, batchsize):
                     input_data = np.transpose(excerpts[pos:pos + batchsize,:,:,np.newaxis],(0,3,1,2))
                     if (pos+batchsize>num_excerpts):
@@ -325,22 +337,36 @@ def main():
                     e = criterion(pred,torch.from_numpy(label_batch).to(device))
                     preds = np.append(preds,pred[:,0].cpu().detach().numpy())
                     labs = np.append(labs,label_batch)
-                    val_err +=e.item()
+                    val_loss +=e.item()
                     num_iter+=1
-           
-            print("Validation loss: %.3f" % (val_err / num_iter))
+
+            print("Validation loss: %.3f" % (val_loss / num_iter))
             _, results = evaluate(preds,labs)
             print("Validation error: %.3f" % (1 - results['accuracy']))
-            #if options.save_errors:
-            #    errors.append(val_err / len(filelist_val))
-            #    errors.append(1 - results['accuracy'])
-        print('Training Loss per epoch', loss_accum/epochsize) 
+            
+            if(val_loss/num_iter<best_val_loss and (1-results['accuracy'])<best_val_error):
+                torch.save(mdl.state_dict(), os.path.join(modelfile, 'model.pth'))
+                best_val_loss = val_loss/num_iter
+                best_val_error = 1-results['accuracy']
+                print('New saved model',best_val_loss, best_val_error)
+                    
+        #Update the learning rate
         scheduler.step()
-        #torch.save(mdl.state_dict(), os.path.join('test',modelfile))
-        writer.add_scalar('avg loss per epoch',loss_accum/epochsize,epoch)
-        writer.add_scalar('Validation loss', val_err/num_iter,epoch) 
         
+        print('Training Loss per epoch', loss_accum/epochsize) 
+        
+        # - Save parameters for examining
+        writer.add_scalar('Training Loss',loss_accum/epochsize,epoch)
+        writer.add_scalar('Validation loss', val_loss/num_iter,epoch) 
+        writer.add_scalar('Gradient norm', total_norm, epoch)
+        writer.add_scalar('Validation error', 1-results['accuracy'])
+        for param_group in optimizer.param_groups:
+            print(param_group['lr'])
     
+    if not options.validate:
+        torch.save(mdl.state_dict(), os.path.join(modelfile, 'model.pth'))
+    #with io.open(os.path.join(modelfile, 'model.vars'), 'wb') as f:
+    #    f.writelines('%s=%s\n' % kv for kv in cfg.items())
 if __name__=="__main__":
     main()
 
