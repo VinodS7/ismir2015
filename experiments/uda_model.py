@@ -61,13 +61,13 @@ class CNNModel(nn.Module):
 
         self.uda = nn.Sequential(
             GradientReversal(),
-            nn.Dropout(),
+            nn.Dropout(p=0.2),
             nn.Linear(64 * 11 * 7, 256),
             nn.LeakyReLU(inplace=True),
-            nn.Dropout(),
+            #nn.Dropout(),
             nn.Linear(256, 64),
             nn.LeakyReLU(inplace=True),
-            nn.Dropout(),
+            #nn.Dropout(),
             nn.Linear(64, 1)
         )
 

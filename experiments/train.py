@@ -28,6 +28,7 @@ import audio
 import znorm
 from labels import create_aligned_targets
 import uda_model
+import model
 import augment
 import config
 
@@ -66,6 +67,7 @@ def opts_parser():
     parser.add_argument('--no-validate',
             action='store_false', dest='validate',
             help='Disable monitoring validation loss')
+    parser.add_argument('-uda', '--uda', default=0, type=int)
     return parser
 
 def main():
@@ -243,7 +245,10 @@ def main():
     ###########################################################################
     
     print("preparing training function...")
-    mdl = uda_model.CNNModel()
+    if options.uda == 0:
+        mdl = model.CNNModel()
+    else:
+        mdl = uda_model.CNNModel()
     mdl = mdl.to(device)
     
     #Setting up learning rate and learning rate parameters
@@ -277,6 +282,8 @@ def main():
         err = 0
         total_norm = 0
         loss_accum = 0
+        loss1_l = []
+        loss2_l = []
         mdl.train(True)
         # - Compute the L-2 norm of the gradients
         for p in mdl.parameters():
@@ -296,15 +303,23 @@ def main():
             optimizer.zero_grad()
             
             outputs = mdl(torch.from_numpy(input_data).to(device))
-            loss1 = criterion(outputs[0], torch.from_numpy(labels).to(device))
-            loss2 = nn.L1Loss()(outputs[1], torch.from_numpy(np.mean(input_data, axis=(2, 3))).to(device))
-            loss = loss1 + loss2
-            print('Loss 1: {} --- Loss 2: {}'.format(loss1, loss2))
+            if options.uda == 0:
+                loss = criterion(outputs, torch.from_numpy(labels).to(device))
+                loss1_l.append(loss.item())
+            else:
+                loss1 = criterion(outputs[0], torch.from_numpy(labels).to(device))
+                loss2 = nn.L1Loss()(outputs[1], torch.from_numpy(np.mean(input_data, axis=(2, 3))).to(device))
+                loss = loss1 + loss2
+                loss1_l.append(loss1.item())
+                loss2_l.append(loss2.item())
             loss.backward()
             optimizer.step()
             loss_accum += loss.item()
         
-        
+        if options.uda == 0:
+            print('Loss 1: {}'.format(np.mean(loss1_l)))
+        else:
+            print('Loss 1: {} --- Loss 2: {}'.format(np.mean(loss1_l), np.mean(loss2_l)))
         # - Compute validation loss and error if desired
         if options.validate:
             
@@ -336,8 +351,10 @@ def main():
                         label_batch = label[blocklen//2+pos:blocklen//2+num_excerpts,np.newaxis].astype(np.float32)
                     else:
                         label_batch = label[blocklen//2+pos:blocklen//2+pos+batchsize,np.newaxis].astype(np.float32)
-                    
+
                     pred = mdl(torch.from_numpy(input_data).to(device))
+                    if options.uda != 0:
+                        pred = pred[0]
                     e = criterion(pred,torch.from_numpy(label_batch).to(device))
                     preds = np.append(preds,pred[:,0].cpu().detach().numpy())
                     labs = np.append(labs,label_batch)
