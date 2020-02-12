@@ -288,6 +288,10 @@ def main():
         for batch in progress(range(epochsize), min_delay=0.5,desc='Epoch %d/%d: Batch ' % (epoch+1, epochs)):
             data = next(batches)
             input_data = np.transpose(data[0][:,:,:,np.newaxis],(0,3,1,2))
+            print(data[0][0].shape,input_data[0].shape)
+            print(data[0][0])
+            print(input_data[0])
+            return
             labels = data[1][:,np.newaxis].astype(np.float32)
             
             #map labels to make them softer

@@ -129,9 +129,12 @@ def main():
     options = parser.parse_args()
     infiles = options.infile
     fps = 70
-    
+    print(infiles[0]) 
     # load network predictions
     preds = np.load(infiles[0])
+
+    for k in preds.files:
+        print(k)
     if len(infiles) > 1:
         preds = {fn: preds[fn] / len(infiles) for fn in preds.files}
         for infile in infiles[1:]:
@@ -139,7 +142,6 @@ def main():
             for fn in preds:
                 preds[fn] += morepreds[fn] / len(infiles)
         del morepreds
-
     # load file lists
     datadir = os.path.join(os.path.dirname(__file__),
                            os.path.pardir, 'datasets', options.dataset)
