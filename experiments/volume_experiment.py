@@ -15,6 +15,7 @@ import sys
 import os
 import io
 from argparse import ArgumentParser
+import json
 
 import numpy as np
 import torch
@@ -245,9 +246,10 @@ def main():
                 layer_data[str(spl)] = out_list
             if(cond):
                 num_iter += 1
-                metadata.append((fl,pos,label[pos],set(frequencies)))
-                #np.savez(os.path.join(outfile,fl+'-'+str(pos)+'.npz'),layer_data)
-                print(metadata)
-                return
+                metadata.append((fl,pos,int(label[pos]),frequencies.tolist()))
+                np.savez(os.path.join(outfile,fl+'-'+str(pos)+'.npz'),layer_data)  
+    with open(os.path.join(outfile,'data.json'), 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=4)
+    return
 if __name__=='__main__':
     main()
