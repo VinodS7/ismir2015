@@ -65,10 +65,11 @@ class CNNModel(nn.Module):
             nn.Linear(64 * 11 * 7, 256),
             nn.LeakyReLU(inplace=True),
             #nn.Dropout(),
-            nn.Linear(256, 64),
-            nn.LeakyReLU(inplace=True),
+            nn.Linear(256, 1)
+            #nn.LeakyReLU(inplace=True),
             #nn.Dropout(),
-            nn.Linear(64, 1)
+
+            #nn.Linear(64, 1)
         )
 
         self.param_count = count_parameters(self)
@@ -112,7 +113,7 @@ class GradientReversalFunction(Function):
 
 
 class GradientReversal(torch.nn.Module):
-    def __init__(self, lambda_=1):
+    def __init__(self, lambda_=0.5):
         super(GradientReversal, self).__init__()
         self.lambda_ = lambda_
 
