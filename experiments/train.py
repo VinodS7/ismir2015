@@ -18,7 +18,8 @@ from argparse import ArgumentParser
 
 import numpy as np
 import torch
-from torch.utils.tensorboard import SummaryWriter
+import torch.nn as nn
+#from torch.utils.tensorboard import SummaryWriter
 floatX = np.float32
 
 from progress import progress
@@ -26,7 +27,7 @@ from simplecache import cached
 import audio
 import znorm
 from labels import create_aligned_targets
-import model
+import uda_model
 import augment
 import config
 
@@ -242,7 +243,7 @@ def main():
     ###########################################################################
     
     print("preparing training function...")
-    mdl = model.CNNModel()
+    mdl = uda_model.CNNModel()
     mdl = mdl.to(device)
     
     #Setting up learning rate and learning rate parameters
@@ -260,7 +261,7 @@ def main():
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer,step_size=eta_decay_every,gamma=eta_decay)
 
     #set up optimizer 
-    writer = SummaryWriter(os.path.join(modelfile,'runs'))
+    #writer = SummaryWriter(os.path.join(modelfile,'runs'))
 
     
     epochs = cfg['epochs']
@@ -295,7 +296,10 @@ def main():
             optimizer.zero_grad()
             
             outputs = mdl(torch.from_numpy(input_data).to(device))
-            loss = criterion(outputs, torch.from_numpy(labels).to(device))
+            loss1 = criterion(outputs[0], torch.from_numpy(labels).to(device))
+            loss2 = nn.L1Loss()(outputs[1], torch.from_numpy(np.mean(input_data, axis=(2, 3))).to(device))
+            loss = loss1 + loss2
+            print('Loss 1: {} --- Loss 2: {}'.format(loss1, loss2))
             loss.backward()
             optimizer.step()
             loss_accum += loss.item()
@@ -356,12 +360,12 @@ def main():
         print('Training Loss per epoch', loss_accum/epochsize) 
         
         # - Save parameters for examining
-        writer.add_scalar('Training Loss',loss_accum/epochsize,epoch)
-        writer.add_scalar('Validation loss', val_loss/num_iter,epoch) 
-        writer.add_scalar('Gradient norm', total_norm, epoch)
-        writer.add_scalar('Validation error', 1-results['accuracy'])
-        for param_group in optimizer.param_groups:
-            print(param_group['lr'])
+        #writer.add_scalar('Training Loss',loss_accum/epochsize,epoch)
+        #writer.add_scalar('Validation loss', val_loss/num_iter,epoch)
+        #writer.add_scalar('Gradient norm', total_norm, epoch)
+        #writer.add_scalar('Validation error', 1-results['accuracy'])
+        #for param_group in optimizer.param_groups:
+            #print(param_group['lr'])
     
     if not options.validate:
         torch.save(mdl.state_dict(), os.path.join(modelfile, 'model.pth'))
