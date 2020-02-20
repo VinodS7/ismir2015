@@ -16,6 +16,7 @@ import os
 import io
 from argparse import ArgumentParser
 import json
+import pickle
 
 import numpy as np
 import torch
@@ -207,10 +208,11 @@ def main():
 
             for i, l in enumerate(mdl_test):
                 for layer in l:
+                    print(layer)
                     data = layer(data.to(device))
                     out_list.append(data.cpu().detach().numpy())
             layer_data['orig']= out_list
-
+            return
             pred_orig = data.cpu().detach().numpy()
 
 
@@ -225,7 +227,7 @@ def main():
                 (unique, counts) = np.unique(label[pos-57:], return_counts=True)
                 frequencies = np.asarray((unique, counts)).T
             
-            cond = False
+            cond = True
             # - Iterate through different volume transformations
             for spl in spl_values:
                 spect_change = change_volume(spect,spl=spl)
@@ -242,12 +244,14 @@ def main():
                         out_list.append(data.cpu().detach().numpy())
                     
                 pred_volume = data.cpu().detach().numpy()
-                cond += (np.abs(pred_volume-pred_orig)>0.3)
+                cond *= (np.abs(pred_volume-pred_orig)<0.05)
                 layer_data[str(spl)] = out_list
             if(cond):
                 num_iter += 1
                 metadata.append((fl,pos,int(label[pos]),frequencies.tolist()))
-                np.savez(os.path.join(outfile,fl+'-'+str(pos)+'.npz'),layer_data)  
+                with open(os.path.join(outfile,fl+'-'+str(pos)+'.pkl'), 'wb') as f:
+                    pickle.dump(layer_data, f, pickle.HIGHEST_PROTOCOL)
+
     with open(os.path.join(outfile,'data.json'), 'w', encoding='utf-8') as f:
         json.dump(metadata, f, ensure_ascii=False, indent=4)
     return
