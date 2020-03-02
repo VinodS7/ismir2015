@@ -30,8 +30,9 @@ def count_parameters(model):
     return total_param
 
 class CNNModel(nn.Module):
-    def __init__(self):
+    def __init__(self,is_zeromean=False):
         super(CNNModel, self).__init__()
+        self.is_zeromean = is_zeromean
         self.conv = nn.Sequential(
                     nn.Conv2d(1,64,3),
                     nn.LeakyReLU(inplace=True),
@@ -71,7 +72,61 @@ class CNNModel(nn.Module):
                                  
     
     def forward(self,x):
+        #print(self.training)
+        if(self.is_zeromean):
+            #print(self.conv[0].weight.shape,self.conv[0].weight[0])
+            self.conv[0].weight.data = self.conv[0].weight.data - torch.mean(self.conv[0].weight.data,(2,3),keepdim=True)
+            #print(torch.sum(self.conv[0].weight.data,(2,3)))
+            #input('continue')
+            #print(torch.sum(self.conv[0].weight.data[0]))
         y = self.conv(x)
         return self.fc(y)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
